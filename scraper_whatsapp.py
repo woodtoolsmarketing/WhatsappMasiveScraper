@@ -2,7 +2,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.keys import Keys # NUEVO: Importamos las teclas del teclado
+from selenium.webdriver.common.keys import Keys
 import time
 import csv
 
@@ -39,14 +39,12 @@ def iniciar_extraccion():
                     if not nombre or nombre in chats_procesados:
                         continue 
                         
-                    # IGNORAR GRUPOS Y DIFUSIONES
                     iconos_grupo = chat.find_elements(By.XPATH, './/span[@data-icon="default-group"] | .//span[@data-icon="default-broadcast"]')
                     if iconos_grupo:
                         print(f"⏩ Grupo/Difusión ignorado: {nombre}")
                         chats_procesados.add(nombre)
                         continue
 
-                    # ENTRAR AL CHAT
                     chat.click()
                     time.sleep(2) 
                     
@@ -66,22 +64,26 @@ def iniciar_extraccion():
                 except Exception as e:
                     continue
 
-            # --- NUEVO SISTEMA DE SCROLL (SIMULA TECLADO) ---
+            # --- SISTEMA DE SCROLL CORREGIDO ---
             if not hubo_nuevos_en_esta_pasada:
                 intentos_sin_nuevos += 1
                 print(f"Buscando más chats en el fondo... (Intento {intentos_sin_nuevos}/3)")
             else:
                 intentos_sin_nuevos = 0 
 
-            # Hacemos clic en el último chat que vimos para asegurarnos de tener la lista seleccionada
             if chats_en_pantalla:
-                chats_en_pantalla[-1].click()
-                time.sleep(1)
-                # Simulamos apretar la tecla "Page Down" (Av Pág) varias veces para bajar de golpe
-                chats_en_pantalla[-1].send_keys(Keys.PAGE_DOWN)
-                chats_en_pantalla[-1].send_keys(Keys.PAGE_DOWN)
+                try:
+                    # En vez de agarrar el último, agarramos un chat en el medio de la pantalla que seguro está visible
+                    chat_seguro = chats_en_pantalla[len(chats_en_pantalla) // 2]
+                    chat_seguro.click()
+                    time.sleep(0.5)
+                    chat_seguro.send_keys(Keys.PAGE_DOWN)
+                    chat_seguro.send_keys(Keys.PAGE_DOWN)
+                except Exception as error_scroll:
+                    # Plan B: si falla el clic, usamos JavaScript para bajar 800 píxeles a la fuerza
+                    driver.execute_script("arguments[0].scrollBy(0, 800);", panel_chats)
             
-            time.sleep(3) # Pausa para que WhatsApp cargue los de abajo
+            time.sleep(3) 
 
     except Exception as e:
         print(f"Error crítico durante el scraping: {e}")
