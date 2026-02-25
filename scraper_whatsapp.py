@@ -2,7 +2,6 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.keys import Keys
 import time
 import csv
 
@@ -22,9 +21,10 @@ def iniciar_extraccion():
         panel_chats = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, "pane-side"))
         )
-        print("Comenzando la lectura masiva... (podés soltar el mouse)")
+        print("Comenzando la lectura masiva ILIMITADA... (podés soltar el mouse)")
 
-        while intentos_sin_nuevos < 3:
+        # Aumentamos a 6 intentos para que sea mucho más insistente antes de rendirse
+        while intentos_sin_nuevos < 6:
             chats_en_pantalla = panel_chats.find_elements(By.XPATH, './/div[@role="row"]')
             hubo_nuevos_en_esta_pasada = False
 
@@ -39,12 +39,16 @@ def iniciar_extraccion():
                     if not nombre or nombre in chats_procesados:
                         continue 
                         
+                    # IGNORAR GRUPOS Y DIFUSIONES
                     iconos_grupo = chat.find_elements(By.XPATH, './/span[@data-icon="default-group"] | .//span[@data-icon="default-broadcast"]')
                     if iconos_grupo:
                         print(f"⏩ Grupo/Difusión ignorado: {nombre}")
                         chats_procesados.add(nombre)
                         continue
 
+                    # ENTRAR AL CHAT (Asegurando primero que esté visible en pantalla)
+                    driver.execute_script("arguments[0].scrollIntoView(true);", chat)
+                    time.sleep(0.5)
                     chat.click()
                     time.sleep(2) 
                     
@@ -64,26 +68,18 @@ def iniciar_extraccion():
                 except Exception as e:
                     continue
 
-            # --- SISTEMA DE SCROLL CORREGIDO ---
+            # --- SCROLL FORZADO POR JAVASCRIPT ---
             if not hubo_nuevos_en_esta_pasada:
                 intentos_sin_nuevos += 1
-                print(f"Buscando más chats en el fondo... (Intento {intentos_sin_nuevos}/3)")
+                print(f"Buscando más chats en el fondo... (Intento {intentos_sin_nuevos}/6)")
+                # Scroll más largo y brusco si no encuentra nada para forzar la carga
+                driver.execute_script("arguments[0].scrollTop += 1200;", panel_chats)
             else:
                 intentos_sin_nuevos = 0 
+                # Scroll normal para seguir avanzando
+                driver.execute_script("arguments[0].scrollTop += 600;", panel_chats)
 
-            if chats_en_pantalla:
-                try:
-                    # En vez de agarrar el último, agarramos un chat en el medio de la pantalla que seguro está visible
-                    chat_seguro = chats_en_pantalla[len(chats_en_pantalla) // 2]
-                    chat_seguro.click()
-                    time.sleep(0.5)
-                    chat_seguro.send_keys(Keys.PAGE_DOWN)
-                    chat_seguro.send_keys(Keys.PAGE_DOWN)
-                except Exception as error_scroll:
-                    # Plan B: si falla el clic, usamos JavaScript para bajar 800 píxeles a la fuerza
-                    driver.execute_script("arguments[0].scrollBy(0, 800);", panel_chats)
-            
-            time.sleep(3) 
+            time.sleep(3) # Tiempo clave para que WhatsApp cargue los chats nuevos de abajo
 
     except Exception as e:
         print(f"Error crítico durante el scraping: {e}")
