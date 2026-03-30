@@ -18,13 +18,14 @@ def iniciar_extraccion():
     intentos_sin_nuevos = 0 
 
     try:
-        panel_chats = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "pane-side"))
-        )
         print("Comenzando la lectura masiva ILIMITADA... (podés soltar el mouse)")
 
-        # Aumentamos a 6 intentos para que sea mucho más insistente antes de rendirse
         while intentos_sin_nuevos < 6:
+            # Capturamos el panel para buscar los chats en pantalla
+            panel_chats = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.ID, "pane-side"))
+            )
+            
             chats_en_pantalla = panel_chats.find_elements(By.XPATH, './/div[@role="row"]')
             hubo_nuevos_en_esta_pasada = False
 
@@ -69,15 +70,19 @@ def iniciar_extraccion():
                     continue
 
             # --- SCROLL FORZADO POR JAVASCRIPT ---
+            # RE-CAPTURAMOS EL PANEL JUSTO ANTES DE HACER SCROLL
+            # Porque el DOM cambia mientras procesamos los chats en el for-loop
+            panel_para_scroll = driver.find_element(By.ID, "pane-side")
+
             if not hubo_nuevos_en_esta_pasada:
                 intentos_sin_nuevos += 1
                 print(f"Buscando más chats en el fondo... (Intento {intentos_sin_nuevos}/6)")
                 # Scroll más largo y brusco si no encuentra nada para forzar la carga
-                driver.execute_script("arguments[0].scrollTop += 1200;", panel_chats)
+                driver.execute_script("arguments[0].scrollTop += 1200;", panel_para_scroll)
             else:
                 intentos_sin_nuevos = 0 
                 # Scroll normal para seguir avanzando
-                driver.execute_script("arguments[0].scrollTop += 600;", panel_chats)
+                driver.execute_script("arguments[0].scrollTop += 600;", panel_para_scroll)
 
             time.sleep(3) # Tiempo clave para que WhatsApp cargue los chats nuevos de abajo
 
